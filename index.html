@@ -332,7 +332,7 @@ tbody td.zero { color: var(--text-dim); opacity: 0.5; }
   <div class="actions">
     <button class="btn btn-primary" id="btnGenerate" disabled>📋 Hesabat yarat</button>
     <button class="btn btn-secondary" id="btnClear" style="display:none">✕ Təmizlə</button>
-    <button class="btn btn-export hidden" id="btnExport">⬇ Excel-ə ixrac et</button>
+    <button class="btn btn-export hidden" id="btnExport">⬇ Excel (.xlsx) ixrac et</button>
     <button class="btn btn-secondary hidden" id="btnPrint">🖨 Çap et</button>
   </div>
 
@@ -340,6 +340,7 @@ tbody td.zero { color: var(--text-dim); opacity: 0.5; }
   <div id="reportArea" class="hidden"></div>
 </div>
 
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 // =========================================
 // XML PARSER
@@ -565,52 +566,147 @@ function buildReport(data) {
 }
 
 // =========================================
-// EXCEL EXPORT (CSV-based, opens in Excel)
+// EXCEL EXPORT (.xlsx with SheetJS)
 // =========================================
-function exportCSV(data) {
+function exportXLSX(data) {
   data.sort((a, b) => (a.yil * 100 + a.ay) - (b.yil * 100 + b.ay));
-  const sep = ';';
-  let csv = '\uFEFF'; // BOM for UTF-8
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  let row = 0;
 
-  csv += `ƏDV Hesabat - ${data[0].adi}${sep}VÖEN: ${data[0].voen}\n\n`;
-
-  // Hissə 1
-  csv += `Hissə 1 - Hesabat dövründəki dövriyyə üzrə ƏDV hesablanması\n`;
-  csv += `Ay${sep}301 Dəyəri${sep}301 Daxil olmuş${sep}301 ƏDV${sep}302 Dəyəri${sep}302 Daxil olmuş${sep}302 ƏDV${sep}303 ƏDV${sep}304 ƏDV${sep}305 Dəyəri${sep}305 Daxil olmuş${sep}305 ƏDV\n`;
-  for (const d of data) {
-    csv += `${monthNames[d.ay]}${sep}${d.h1001_edvsiz}${sep}${d.h1001_edvsiz}${sep}${d.h1001_edv}${sep}${d.h1002_deyer}${sep}${d.h1002_edvsiz}${sep}${d.h1002_edv}${sep}${d.h1003_edv}${sep}${d.h1004_edv}${sep}${d.h1005_deyer}${sep}${d.h1005_edvsiz}${sep}${d.h1005_edv}\n`;
-  }
-  csv += '\n';
-
-  // Hissə 2
-  csv += `Hissə 2 - ƏDV-nin əvəzləşdirilməsi\n`;
-  csv += `Ay${sep}Alışlar (ƏDV-siz)${sep}Alışlar (ƏDV)${sep}Cəmi əvəzl. (ƏDV-siz)${sep}Cəmi əvəzl. (ƏDV)\n`;
-  for (const d of data) {
-    csv += `${monthNames[d.ay]}${sep}${d.a1008_edvsiz}${sep}${d.a1008_edv}${sep}${d.a1016_edvsiz}${sep}${d.a1016_edv}\n`;
-  }
-  csv += '\n';
-
-  // Hissə 3
-  csv += `Hissə 3 - Debitor borc\n`;
-  csv += `Ay${sep}Əvvələ qalıq${sep}Yaranan${sep}Silinən${sep}Sona qalıq\n`;
-  for (const d of data) {
-    csv += `${monthNames[d.ay]}${sep}${d.d1400_evvel}${sep}${d.d1400_yaranan}${sep}${d.d1400_silinen}${sep}${d.d1400_son}\n`;
-  }
-  csv += '\n';
-
-  // Hissə 4
-  csv += `Hissə 4 - Hesablaşma\n`;
-  csv += `Ay${sep}Ödənilməli${sep}Qaytarılmalı\n`;
-  for (const d of data) {
-    csv += `${monthNames[d.ay]}${sep}${d.odenilmeli}${sep}${d.qaytarilmali}\n`;
+  // Helper: set cell with optional style
+  function setCell(r, c, val, opts = {}) {
+    const ref = XLSX.utils.encode_cell({ r, c });
+    const cell = { v: val, t: typeof val === 'number' ? 'n' : 's' };
+    if (opts.numFmt) cell.z = opts.numFmt;
+    ws[ref] = cell;
   }
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `EDV_Hesabat_${data[0].yil}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  function sumCol(data, field) {
+    return data.reduce((s, d) => s + (d[field] || 0), 0);
+  }
+
+  // ===== Title =====
+  setCell(row, 0, `ƏDV (НДС) Bəyannamə Hesabatı — ${data[0].yil}`);
+  row++;
+  setCell(row, 0, data[0].adi);
+  row++;
+  setCell(row, 0, `VÖEN: ${data[0].voen}`);
+  row += 2;
+
+  // ===== Hissə 1 =====
+  setCell(row, 0, 'Hissə 1 - Hesabat dövründəki dövriyyə üzrə əlavə dəyər vergisinin hesablanması');
+  row++;
+
+  // Group headers
+  setCell(row, 0, 'Ay');
+  setCell(row, 1, '301. ƏDV 18% dərəcə ilə cəlb olunan əməliyyatlar');
+  setCell(row, 4, '302. ƏDV-yə sıfır dərəcə ilə cəlb olunan əməliyyatlar');
+  setCell(row, 7, '303. Azad');
+  setCell(row, 8, '304. 20%');
+  setCell(row, 9, '305. Əməliyyatlar üzrə CƏMİ');
+  row++;
+
+  // Sub-headers
+  const subH = ['Dəyəri (ƏDV-siz)', 'Daxil olmuş məbləğ', 'ƏDV məbləği'];
+  setCell(row, 0, '');
+  for (let i = 0; i < 3; i++) setCell(row, 1 + i, subH[i]);
+  for (let i = 0; i < 3; i++) setCell(row, 4 + i, subH[i]);
+  setCell(row, 7, 'ƏDV');
+  setCell(row, 8, 'ƏDV');
+  for (let i = 0; i < 3; i++) setCell(row, 9 + i, subH[i]);
+  row++;
+
+  // Data
+  const nf = '#,##0.00';
+  for (const d of data) {
+    setCell(row, 0, monthNames[d.ay]);
+    setCell(row, 1, d.h1001_edvsiz, {numFmt: nf});
+    setCell(row, 2, d.h1001_edvsiz, {numFmt: nf});
+    setCell(row, 3, d.h1001_edv, {numFmt: nf});
+    setCell(row, 4, d.h1002_deyer, {numFmt: nf});
+    setCell(row, 5, d.h1002_edvsiz, {numFmt: nf});
+    setCell(row, 6, d.h1002_edv, {numFmt: nf});
+    setCell(row, 7, d.h1003_edv, {numFmt: nf});
+    setCell(row, 8, d.h1004_edv, {numFmt: nf});
+    setCell(row, 9, d.h1005_deyer, {numFmt: nf});
+    setCell(row, 10, d.h1005_edvsiz, {numFmt: nf});
+    setCell(row, 11, d.h1005_edv, {numFmt: nf});
+    row++;
+  }
+  // Totals
+  setCell(row, 0, 'CƏMİ');
+  const s1f = ['h1001_edvsiz','h1001_edvsiz','h1001_edv','h1002_deyer','h1002_edvsiz','h1002_edv','h1003_edv','h1004_edv','h1005_deyer','h1005_edvsiz','h1005_edv'];
+  s1f.forEach((f, i) => setCell(row, 1 + i, sumCol(data, f), {numFmt: nf}));
+  row += 2;
+
+  // ===== Hissə 2 =====
+  setCell(row, 0, 'Hissə 2 - ƏDV-nin əvəzləşdirilməsi');
+  row++;
+  ['Ay', 'Alışlar (ƏDV-siz)', 'Alışlar (ƏDV)', 'Cəmi əvəzləşdirilən (ƏDV-siz)', 'Cəmi əvəzləşdirilən (ƏDV)'].forEach((h, i) => setCell(row, i, h));
+  row++;
+  for (const d of data) {
+    setCell(row, 0, monthNames[d.ay]);
+    setCell(row, 1, d.a1008_edvsiz, {numFmt: nf});
+    setCell(row, 2, d.a1008_edv, {numFmt: nf});
+    setCell(row, 3, d.a1016_edvsiz, {numFmt: nf});
+    setCell(row, 4, d.a1016_edv, {numFmt: nf});
+    row++;
+  }
+  setCell(row, 0, 'CƏMİ');
+  ['a1008_edvsiz','a1008_edv','a1016_edvsiz','a1016_edv'].forEach((f, i) => setCell(row, 1 + i, sumCol(data, f), {numFmt: nf}));
+  row += 2;
+
+  // ===== Hissə 3 =====
+  setCell(row, 0, 'Hissə 3 - Debitor borc');
+  row++;
+  ['Ay', 'Əvvələ qalıq', 'Yaranan borc', 'Silinən borc', 'Sona qalıq'].forEach((h, i) => setCell(row, i, h));
+  row++;
+  for (const d of data) {
+    setCell(row, 0, monthNames[d.ay]);
+    setCell(row, 1, d.d1400_evvel, {numFmt: nf});
+    setCell(row, 2, d.d1400_yaranan, {numFmt: nf});
+    setCell(row, 3, d.d1400_silinen, {numFmt: nf});
+    setCell(row, 4, d.d1400_son, {numFmt: nf});
+    row++;
+  }
+  row++;
+
+  // ===== Hissə 4 =====
+  setCell(row, 0, 'Hissə 4 - Hesablaşma');
+  row++;
+  ['Ay', 'Ödənilməli', 'Qaytarılmalı'].forEach((h, i) => setCell(row, i, h));
+  row++;
+  for (const d of data) {
+    setCell(row, 0, monthNames[d.ay]);
+    setCell(row, 1, d.odenilmeli, {numFmt: nf});
+    setCell(row, 2, d.qaytarilmali, {numFmt: nf});
+    row++;
+  }
+  setCell(row, 0, 'CƏMİ');
+  setCell(row, 1, sumCol(data, 'odenilmeli'), {numFmt: nf});
+  setCell(row, 2, sumCol(data, 'qaytarilmali'), {numFmt: nf});
+
+  // Set range
+  ws['!ref'] = XLSX.utils.encode_range({ s: {r:0,c:0}, e: {r: row, c: 11} });
+
+  // Column widths
+  ws['!cols'] = [
+    {wch: 14}, {wch: 18}, {wch: 18}, {wch: 16},
+    {wch: 18}, {wch: 18}, {wch: 16},
+    {wch: 14}, {wch: 14},
+    {wch: 18}, {wch: 18}, {wch: 16}
+  ];
+
+  // Merges for group headers (row 5)
+  ws['!merges'] = [
+    {s:{r:5,c:1}, e:{r:5,c:3}},   // 301
+    {s:{r:5,c:4}, e:{r:5,c:6}},   // 302
+    {s:{r:5,c:9}, e:{r:5,c:11}},  // 305
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'ƏDV Hesabat');
+  XLSX.writeFile(wb, `EDV_Hesabat_${data[0].yil}.xlsx`);
 }
 
 // =========================================
@@ -701,7 +797,7 @@ btnGenerate.addEventListener('click', () => {
   reportArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-btnExport.addEventListener('click', () => { if (parsedData.length) exportCSV(parsedData); });
+btnExport.addEventListener('click', () => { if (parsedData.length) exportXLSX(parsedData); });
 btnPrint.addEventListener('click', () => window.print());
 </script>
 </body>
