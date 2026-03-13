@@ -340,7 +340,7 @@ tbody td.zero { color: var(--text-dim); opacity: 0.5; }
   <div id="reportArea" class="hidden"></div>
 </div>
 
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script>
 // =========================================
 // XML PARSER
@@ -566,147 +566,220 @@ function buildReport(data) {
 }
 
 // =========================================
-// EXCEL EXPORT (.xlsx with SheetJS)
+// EXCEL EXPORT (.xlsx with ExcelJS)
 // =========================================
-function exportXLSX(data) {
+async function exportXLSX(data) {
   data.sort((a, b) => (a.yil * 100 + a.ay) - (b.yil * 100 + b.ay));
-  const wb = XLSX.utils.book_new();
-  const ws = {};
-  let row = 0;
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('ƏDV Hesabat', {
+    pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1 }
+  });
 
-  // Helper: set cell with optional style
-  function setCell(r, c, val, opts = {}) {
-    const ref = XLSX.utils.encode_cell({ r, c });
-    const cell = { v: val, t: typeof val === 'number' ? 'n' : 's' };
-    if (opts.numFmt) cell.z = opts.numFmt;
-    ws[ref] = cell;
+  // Styles
+  const border = { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+  const nf = '#,##0.00';
+  const titleFont = { name:'Arial', size:14, bold:true };
+  const sectionFont = { name:'Arial', size:11, bold:true, color:{argb:'FFFFFFFF'} };
+  const sectionFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F4E79'} };
+  const groupFont = { name:'Arial', size:10, bold:true, color:{argb:'FFFFFFFF'} };
+  const groupFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF4472C4'} };
+  const headerFont = { name:'Arial', size:9, bold:true };
+  const headerFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD6E4F0'} };
+  const dataFont = { name:'Arial', size:10 };
+  const totalFont = { name:'Arial', size:10, bold:true };
+  const totalFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE2EFDA'} };
+  const centerAlign = { horizontal:'center', vertical:'middle', wrapText:true };
+  const rightAlign = { horizontal:'right', vertical:'middle' };
+  const leftAlign = { horizontal:'left', vertical:'middle' };
+
+  function sumF(field) { return data.reduce((s, d) => s + (d[field]||0), 0); }
+
+  function styleRange(r1, c1, r2, c2, opts) {
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = ws.getCell(r, c);
+        if (opts.font) cell.font = opts.font;
+        if (opts.fill) cell.fill = opts.fill;
+        if (opts.alignment) cell.alignment = opts.alignment;
+        if (opts.border) cell.border = opts.border;
+        if (opts.numFmt) cell.numFmt = opts.numFmt;
+      }
+    }
   }
 
-  function sumCol(data, field) {
-    return data.reduce((s, d) => s + (d[field] || 0), 0);
-  }
+  // Column widths
+  ws.columns = [
+    {width:14},{width:20},{width:20},{width:17},{width:20},{width:20},{width:17},{width:14},{width:14},{width:20},{width:20},{width:17}
+  ];
 
-  // ===== Title =====
-  setCell(row, 0, `ƏDV (НДС) Bəyannamə Hesabatı — ${data[0].yil}`);
+  let row = 1;
+
+  // ===== TITLE =====
+  ws.mergeCells(row, 1, row, 12);
+  ws.getCell(row, 1).value = `ƏDV (НДС) Bəyannamə Hesabatı — ${data[0].yil}`;
+  ws.getCell(row, 1).font = titleFont;
+  ws.getCell(row, 1).alignment = { horizontal:'center' };
   row++;
-  setCell(row, 0, data[0].adi);
+  ws.mergeCells(row, 1, row, 12);
+  ws.getCell(row, 1).value = data[0].adi;
+  ws.getCell(row, 1).font = { name:'Arial', size:11, bold:true };
+  ws.getCell(row, 1).alignment = { horizontal:'center' };
   row++;
-  setCell(row, 0, `VÖEN: ${data[0].voen}`);
+  ws.mergeCells(row, 1, row, 12);
+  ws.getCell(row, 1).value = `VÖEN: ${data[0].voen}`;
+  ws.getCell(row, 1).font = { name:'Arial', size:10, italic:true };
+  ws.getCell(row, 1).alignment = { horizontal:'center' };
   row += 2;
 
-  // ===== Hissə 1 =====
-  setCell(row, 0, 'Hissə 1 - Hesabat dövründəki dövriyyə üzrə əlavə dəyər vergisinin hesablanması');
+  // ===== HİSSƏ 1 =====
+  ws.mergeCells(row, 1, row, 12);
+  ws.getCell(row, 1).value = 'Hissə 1 - Hesabat dövründəki dövriyyə üzrə əlavə dəyər vergisinin hesablanması';
+  styleRange(row, 1, row, 12, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
   row++;
 
   // Group headers
-  setCell(row, 0, 'Ay');
-  setCell(row, 1, '301. ƏDV 18% dərəcə ilə cəlb olunan əməliyyatlar');
-  setCell(row, 4, '302. ƏDV-yə sıfır dərəcə ilə cəlb olunan əməliyyatlar');
-  setCell(row, 7, '303. Azad');
-  setCell(row, 8, '304. 20%');
-  setCell(row, 9, '305. Əməliyyatlar üzrə CƏMİ');
+  const gr = row;
+  ws.mergeCells(gr, 1, gr+1, 1);
+  ws.getCell(gr, 1).value = 'Ay';
+  ws.mergeCells(gr, 2, gr, 4);
+  ws.getCell(gr, 2).value = '301. ƏDV 18% dərəcə ilə cəlb olunan əməliyyatlar';
+  ws.mergeCells(gr, 5, gr, 7);
+  ws.getCell(gr, 5).value = '302. ƏDV-yə sıfır dərəcə ilə cəlb olunan əməliyyatlar';
+  ws.getCell(gr, 8).value = '303. Azad';
+  ws.getCell(gr, 9).value = '304. 20%';
+  ws.mergeCells(gr, 10, gr, 12);
+  ws.getCell(gr, 10).value = '305. Əməliyyatlar üzrə CƏMİ';
+  styleRange(gr, 1, gr, 12, { font:groupFont, fill:groupFill, alignment:centerAlign, border });
   row++;
 
   // Sub-headers
-  const subH = ['Dəyəri (ƏDV-siz)', 'Daxil olmuş məbləğ', 'ƏDV məbləği'];
-  setCell(row, 0, '');
-  for (let i = 0; i < 3; i++) setCell(row, 1 + i, subH[i]);
-  for (let i = 0; i < 3; i++) setCell(row, 4 + i, subH[i]);
-  setCell(row, 7, 'ƏDV');
-  setCell(row, 8, 'ƏDV');
-  for (let i = 0; i < 3; i++) setCell(row, 9 + i, subH[i]);
+  const sub = ['Təqdim edilmiş dəyəri (ƏDV-siz)', 'Daxil olmuş məbləğ', 'ƏDV məbləği'];
+  for (let i = 0; i < 3; i++) ws.getCell(row, 2+i).value = sub[i];
+  for (let i = 0; i < 3; i++) ws.getCell(row, 5+i).value = sub[i];
+  ws.getCell(row, 8).value = 'ƏDV';
+  ws.getCell(row, 9).value = 'ƏDV';
+  for (let i = 0; i < 3; i++) ws.getCell(row, 10+i).value = sub[i];
+  styleRange(row, 1, row, 12, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
+  ws.getRow(row).height = 40;
   row++;
 
-  // Data
-  const nf = '#,##0.00';
+  // Data rows
+  const ds1 = row;
   for (const d of data) {
-    setCell(row, 0, monthNames[d.ay]);
-    setCell(row, 1, d.h1001_edvsiz, {numFmt: nf});
-    setCell(row, 2, d.h1001_edvsiz, {numFmt: nf});
-    setCell(row, 3, d.h1001_edv, {numFmt: nf});
-    setCell(row, 4, d.h1002_deyer, {numFmt: nf});
-    setCell(row, 5, d.h1002_edvsiz, {numFmt: nf});
-    setCell(row, 6, d.h1002_edv, {numFmt: nf});
-    setCell(row, 7, d.h1003_edv, {numFmt: nf});
-    setCell(row, 8, d.h1004_edv, {numFmt: nf});
-    setCell(row, 9, d.h1005_deyer, {numFmt: nf});
-    setCell(row, 10, d.h1005_edvsiz, {numFmt: nf});
-    setCell(row, 11, d.h1005_edv, {numFmt: nf});
+    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 2).value = d.h1001_edvsiz;
+    ws.getCell(row, 3).value = d.h1001_edvsiz;
+    ws.getCell(row, 4).value = d.h1001_edv;
+    ws.getCell(row, 5).value = d.h1002_deyer;
+    ws.getCell(row, 6).value = d.h1002_edvsiz;
+    ws.getCell(row, 7).value = d.h1002_edv;
+    ws.getCell(row, 8).value = d.h1003_edv;
+    ws.getCell(row, 9).value = d.h1004_edv;
+    ws.getCell(row, 10).value = d.h1005_deyer;
+    ws.getCell(row, 11).value = d.h1005_edvsiz;
+    ws.getCell(row, 12).value = d.h1005_edv;
+    styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
+    styleRange(row, 2, row, 12, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
+    if ((row - ds1) % 2 === 1) {
+      styleRange(row, 1, row, 12, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
+    }
     row++;
   }
-  // Totals
-  setCell(row, 0, 'CƏMİ');
+  // Total
+  ws.getCell(row, 1).value = 'CƏMİ';
   const s1f = ['h1001_edvsiz','h1001_edvsiz','h1001_edv','h1002_deyer','h1002_edvsiz','h1002_edv','h1003_edv','h1004_edv','h1005_deyer','h1005_edvsiz','h1005_edv'];
-  s1f.forEach((f, i) => setCell(row, 1 + i, sumCol(data, f), {numFmt: nf}));
+  s1f.forEach((f, i) => { ws.getCell(row, 2+i).value = sumF(f); });
+  styleRange(row, 1, row, 1, { font:totalFont, fill:totalFill, alignment:leftAlign, border });
+  styleRange(row, 2, row, 12, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
   row += 2;
 
-  // ===== Hissə 2 =====
-  setCell(row, 0, 'Hissə 2 - ƏDV-nin əvəzləşdirilməsi');
+  // ===== HİSSƏ 2 =====
+  ws.mergeCells(row, 1, row, 5);
+  ws.getCell(row, 1).value = 'Hissə 2 - ƏDV-nin əvəzləşdirilməsi';
+  styleRange(row, 1, row, 5, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
   row++;
-  ['Ay', 'Alışlar (ƏDV-siz)', 'Alışlar (ƏDV)', 'Cəmi əvəzləşdirilən (ƏDV-siz)', 'Cəmi əvəzləşdirilən (ƏDV)'].forEach((h, i) => setCell(row, i, h));
+  ['Ay','Alışlar (ƏDV-siz)','Alışlar (ƏDV)','Cəmi əvəzləşdirilən (ƏDV-siz)','Cəmi əvəzləşdirilən (ƏDV)'].forEach((h, i) => { ws.getCell(row, 1+i).value = h; });
+  styleRange(row, 1, row, 5, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
+  ws.getRow(row).height = 32;
   row++;
+  const ds2 = row;
   for (const d of data) {
-    setCell(row, 0, monthNames[d.ay]);
-    setCell(row, 1, d.a1008_edvsiz, {numFmt: nf});
-    setCell(row, 2, d.a1008_edv, {numFmt: nf});
-    setCell(row, 3, d.a1016_edvsiz, {numFmt: nf});
-    setCell(row, 4, d.a1016_edv, {numFmt: nf});
+    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 2).value = d.a1008_edvsiz;
+    ws.getCell(row, 3).value = d.a1008_edv;
+    ws.getCell(row, 4).value = d.a1016_edvsiz;
+    ws.getCell(row, 5).value = d.a1016_edv;
+    styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
+    styleRange(row, 2, row, 5, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
+    if ((row - ds2) % 2 === 1) {
+      styleRange(row, 1, row, 5, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
+    }
     row++;
   }
-  setCell(row, 0, 'CƏMİ');
-  ['a1008_edvsiz','a1008_edv','a1016_edvsiz','a1016_edv'].forEach((f, i) => setCell(row, 1 + i, sumCol(data, f), {numFmt: nf}));
+  ws.getCell(row, 1).value = 'CƏMİ';
+  ['a1008_edvsiz','a1008_edv','a1016_edvsiz','a1016_edv'].forEach((f, i) => { ws.getCell(row, 2+i).value = sumF(f); });
+  styleRange(row, 1, row, 1, { font:totalFont, fill:totalFill, alignment:leftAlign, border });
+  styleRange(row, 2, row, 5, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
   row += 2;
 
-  // ===== Hissə 3 =====
-  setCell(row, 0, 'Hissə 3 - Debitor borc');
+  // ===== HİSSƏ 3 =====
+  ws.mergeCells(row, 1, row, 5);
+  ws.getCell(row, 1).value = 'Hissə 3 - Debitor borc';
+  styleRange(row, 1, row, 5, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
   row++;
-  ['Ay', 'Əvvələ qalıq', 'Yaranan borc', 'Silinən borc', 'Sona qalıq'].forEach((h, i) => setCell(row, i, h));
+  ['Ay','Əvvələ qalıq','Yaranan borc','Silinən borc','Sona qalıq'].forEach((h, i) => { ws.getCell(row, 1+i).value = h; });
+  styleRange(row, 1, row, 5, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
   row++;
+  const ds3 = row;
   for (const d of data) {
-    setCell(row, 0, monthNames[d.ay]);
-    setCell(row, 1, d.d1400_evvel, {numFmt: nf});
-    setCell(row, 2, d.d1400_yaranan, {numFmt: nf});
-    setCell(row, 3, d.d1400_silinen, {numFmt: nf});
-    setCell(row, 4, d.d1400_son, {numFmt: nf});
+    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 2).value = d.d1400_evvel;
+    ws.getCell(row, 3).value = d.d1400_yaranan;
+    ws.getCell(row, 4).value = d.d1400_silinen;
+    ws.getCell(row, 5).value = d.d1400_son;
+    styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
+    styleRange(row, 2, row, 5, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
+    if ((row - ds3) % 2 === 1) {
+      styleRange(row, 1, row, 5, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
+    }
     row++;
   }
   row++;
 
-  // ===== Hissə 4 =====
-  setCell(row, 0, 'Hissə 4 - Hesablaşma');
+  // ===== HİSSƏ 4 =====
+  ws.mergeCells(row, 1, row, 3);
+  ws.getCell(row, 1).value = 'Hissə 4 - Hesablaşma';
+  styleRange(row, 1, row, 3, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
   row++;
-  ['Ay', 'Ödənilməli', 'Qaytarılmalı'].forEach((h, i) => setCell(row, i, h));
+  ['Ay','Ödənilməli','Qaytarılmalı'].forEach((h, i) => { ws.getCell(row, 1+i).value = h; });
+  styleRange(row, 1, row, 3, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
   row++;
+  const ds4 = row;
   for (const d of data) {
-    setCell(row, 0, monthNames[d.ay]);
-    setCell(row, 1, d.odenilmeli, {numFmt: nf});
-    setCell(row, 2, d.qaytarilmali, {numFmt: nf});
+    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 2).value = d.odenilmeli;
+    ws.getCell(row, 3).value = d.qaytarilmali;
+    styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
+    styleRange(row, 2, row, 3, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
+    if ((row - ds4) % 2 === 1) {
+      styleRange(row, 1, row, 3, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
+    }
     row++;
   }
-  setCell(row, 0, 'CƏMİ');
-  setCell(row, 1, sumCol(data, 'odenilmeli'), {numFmt: nf});
-  setCell(row, 2, sumCol(data, 'qaytarilmali'), {numFmt: nf});
+  ws.getCell(row, 1).value = 'CƏMİ';
+  ws.getCell(row, 2).value = sumF('odenilmeli');
+  ws.getCell(row, 3).value = sumF('qaytarilmali');
+  styleRange(row, 1, row, 1, { font:totalFont, fill:totalFill, alignment:leftAlign, border });
+  styleRange(row, 2, row, 3, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
 
-  // Set range
-  ws['!ref'] = XLSX.utils.encode_range({ s: {r:0,c:0}, e: {r: row, c: 11} });
-
-  // Column widths
-  ws['!cols'] = [
-    {wch: 14}, {wch: 18}, {wch: 18}, {wch: 16},
-    {wch: 18}, {wch: 18}, {wch: 16},
-    {wch: 14}, {wch: 14},
-    {wch: 18}, {wch: 18}, {wch: 16}
-  ];
-
-  // Merges for group headers (row 5)
-  ws['!merges'] = [
-    {s:{r:5,c:1}, e:{r:5,c:3}},   // 301
-    {s:{r:5,c:4}, e:{r:5,c:6}},   // 302
-    {s:{r:5,c:9}, e:{r:5,c:11}},  // 305
-  ];
-
-  XLSX.utils.book_append_sheet(wb, ws, 'ƏDV Hesabat');
-  XLSX.writeFile(wb, `EDV_Hesabat_${data[0].yil}.xlsx`);
+  // Save
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `EDV_Hesabat_${data[0].yil}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // =========================================
@@ -797,7 +870,7 @@ btnGenerate.addEventListener('click', () => {
   reportArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
-btnExport.addEventListener('click', () => { if (parsedData.length) exportXLSX(parsedData); });
+btnExport.addEventListener('click', async () => { if (parsedData.length) await exportXLSX(parsedData); });
 btnPrint.addEventListener('click', () => window.print());
 </script>
 </body>
