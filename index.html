@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ƏDV Hesabat Generatoru</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #232735;
+  --border: #2e3345;
+  --border-accent: #3d6aff;
+  --text: #e4e7ef;
+  --text-dim: #8891a8;
+  --accent: #3d6aff;
+  --accent-soft: rgba(61,106,255,0.12);
+  --green: #2dd4a0;
+  --green-soft: rgba(45,212,160,0.12);
+  --red: #ff5c72;
+  --orange: #ffaa3b;
+  --header-bg: #1e2a4a;
+  --row-alt: rgba(61,106,255,0.04);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+.app-header {
+  padding: 28px 40px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.app-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-header h1 .icon {
+  width: 32px; height: 32px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.app-header p { color: var(--text-dim); font-size: 14px; margin-top: 4px; padding-left: 42px; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 32px 40px; }
+
+/* Upload Zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 48px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+.upload-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, var(--accent-soft) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+.upload-zone:hover::before, .upload-zone.dragover::before { opacity: 1; }
+.upload-zone .icon-upload {
+  width: 56px; height: 56px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 24px;
+  position: relative;
+}
+.upload-zone h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; position: relative; }
+.upload-zone p { color: var(--text-dim); font-size: 13px; position: relative; }
+.upload-zone input { display: none; }
+
+/* File List */
+.file-list {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  animation: chipIn 0.3s ease;
+}
+.file-chip .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.file-chip .remove {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.file-chip .remove:hover { color: var(--red); }
+@keyframes chipIn {
+  from { opacity:0; transform: scale(0.9) translateY(4px); }
+  to { opacity:1; transform: scale(1) translateY(0); }
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #5580ff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(61,106,255,0.3); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--text-dim); }
+.btn-export {
+  background: var(--green-soft);
+  color: var(--green);
+  border: 1px solid rgba(45,212,160,0.25);
+}
+.btn-export:hover { background: rgba(45,212,160,0.2); }
+
+/* Company Info Banner */
+.company-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  animation: fadeUp 0.4s ease;
+}
+.company-banner .info h2 { font-size: 16px; font-weight: 600; }
+.company-banner .info span { color: var(--text-dim); font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+.company-banner .stats {
+  display: flex;
+  gap: 24px;
+}
+.company-banner .stat {
+  text-align: center;
+}
+.company-banner .stat .val {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.company-banner .stat .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Report Section */
+.report { margin-top: 28px; animation: fadeUp 0.5s ease; }
+.section { margin-bottom: 32px; }
+.section-header {
+  background: var(--header-bg);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 10px 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-header .num {
+  background: rgba(255,255,255,0.15);
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Table */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+thead th {
+  background: var(--surface2);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 10px 14px;
+  text-align: center;
+  border: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+thead th.group-header {
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+tbody td {
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 400;
+}
+tbody td:first-child {
+  text-align: left;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  background: var(--surface);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+tbody tr:nth-child(even) td { background: var(--row-alt); }
+tbody tr:nth-child(even) td:first-child { background: var(--surface); }
+tbody tr:hover td { background: var(--accent-soft); }
+tbody tr:hover td:first-child { background: var(--accent-soft); }
+tbody tr.total-row td {
+  background: var(--green-soft) !important;
+  font-weight: 700;
+  color: var(--green);
+  border-top: 2px solid var(--green);
+}
+tbody td.zero { color: var(--text-dim); opacity: 0.5; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(12px); }
+  to { opacity:1; transform: translateY(0); }
+}
+
+/* Print */
+@media print {
+  body { background: #fff; color: #000; }
+  .app-header, .upload-zone, .actions, .file-list { display: none; }
+  .container { padding: 10px; }
+  .section-header { background: #2c3e6b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  table { font-size: 10px; }
+  thead th { background: #e8edf5 !important; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  tbody td { color: #000; }
+  tbody tr.total-row td { background: #e6f5ed !important; color: #1a7a4c; }
+  .company-banner { border-color: #ccc; }
+}
+
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1><span class="icon">📊</span> ƏDV Hesabat Generatoru</h1>
+  <p>XML bəyannamə fayllarını yükləyin — aylıq hesabat avtomatik yaradılacaq</p>
+</div>
+
+<div class="container">
+  <!-- Upload -->
+  <div class="upload-zone" id="dropZone">
+    <div class="icon-upload">📁</div>
+    <h3>XML faylları bura atın və ya klikləyin</h3>
+    <p>ƏDV bəyannamə XML faylları (bir və ya bir neçə ay)</p>
+    <input type="file" id="fileInput" accept=".xml" multiple>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btnGenerate" disabled>📋 Hesabat yarat</button>
+    <button class="btn btn-secondary" id="btnClear" style="display:none">✕ Təmizlə</button>
+    <button class="btn btn-export hidden" id="btnExport">⬇ Excel-ə ixrac et</button>
+    <button class="btn btn-secondary hidden" id="btnPrint">🖨 Çap et</button>
+  </div>
+
+  <!-- Report Output -->
+  <div id="reportArea" class="hidden"></div>
+</div>
+
+<script>
+// =========================================
+// XML PARSER
+// =========================================
+function parseEDVXml(xmlText) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlText, 'text/xml');
+  if (doc.querySelector('parsererror')) return null;
+
+  const root = doc.documentElement;
+  const ay = parseInt(root.querySelector('donem > ay')?.textContent || '0');
+  const yil = parseInt(root.querySelector('donem > yil')?.textContent || '0');
+  const adi = root.querySelector('mukellef > adi')?.textContent?.trim() || '';
+  const voen = root.querySelector('mukellef > vergiNo')?.textContent?.trim() || '';
+
+  function rv(sectionTag, code, field) {
+    const section = root.querySelector(sectionTag);
+    if (!section) return 0;
+    for (const row of section.querySelectorAll('row')) {
+      if (row.querySelector('gosterici')?.textContent === String(code)) {
+        const el = row.querySelector(field);
+        return el ? parseFloat(el.textContent) || 0 : 0;
+      }
+    }
+    return 0;
+  }
+
+  const vergi = root.querySelector('vergiAsil');
+  return {
+    ay, yil, adi, voen,
+    odenilmeli: parseFloat(vergi?.querySelector('odenilmeli')?.textContent) || 0,
+    qaytarilmali: parseFloat(vergi?.querySelector('qaytarilmali')?.textContent) || 0,
+    // 301
+    h1001_edvsiz: rv('HesaplamaUzreEnt', 1001, 'edvsiz'),
+    h1001_edv: rv('HesaplamaUzreEnt', 1001, 'edv'),
+    // 302
+    h1002_deyer: rv('HesaplamaUzreEnt', 1002, 'deyer'),
+    h1002_edvsiz: rv('HesaplamaUzreEnt', 1002, 'edvsiz'),
+    h1002_edv: rv('HesaplamaUzreEnt', 1002, 'edv'),
+    // 303
+    h1003_edv: rv('HesaplamaUzreEnt', 1003, 'edv'),
+    // 304
+    h1004_edv: rv('HesaplamaUzreEnt', 1004, 'edv'),
+    // 305
+    h1005_deyer: rv('HesaplamaUzreEnt', 1005, 'deyer'),
+    h1005_edvsiz: rv('HesaplamaUzreEnt', 1005, 'edvsiz'),
+    h1005_edv: rv('HesaplamaUzreEnt', 1005, 'edv'),
+    // Əvəzləşdirmə
+    a1008_edvsiz: rv('HesaplamaAvazEnt', 1008, 'edvsiz'),
+    a1008_edv: rv('HesaplamaAvazEnt', 1008, 'edv'),
+    a1016_edvsiz: rv('HesaplamaAvazEnt', 1016, 'edvsiz'),
+    a1016_edv: rv('HesaplamaAvazEnt', 1016, 'edv'),
+    // Debitor
+    d1400_evvel: rv('DebitorBorcEnt', 1400, 'borcEvvel'),
+    d1400_yaranan: rv('DebitorBorcEnt', 1400, 'borcYaranan'),
+    d1400_silinen: rv('DebitorBorcEnt', 1400, 'borcSilinen'),
+    d1400_son: rv('DebitorBorcEnt', 1400, 'borcSon'),
+  };
+}
+
+// =========================================
+// FORMATTER
+// =========================================
+const monthNames = {1:'Yanvar',2:'Fevral',3:'Mart',4:'Aprel',5:'May',6:'İyun',7:'İyul',8:'Avqust',9:'Sentyabr',10:'Oktyabr',11:'Noyabr',12:'Dekabr'};
+
+function fmt(n) {
+  if (n === 0) return '<span class="zero">0.00</span>';
+  return n.toLocaleString('az-AZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtRaw(n) {
+  return n.toLocaleString('az-AZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function sumField(data, field) {
+  return data.reduce((s, d) => s + d[field], 0);
+}
+
+// =========================================
+// REPORT BUILDER
+// =========================================
+function buildReport(data) {
+  data.sort((a, b) => (a.yil * 100 + a.ay) - (b.yil * 100 + b.ay));
+
+  const company = data[0].adi;
+  const voen = data[0].voen;
+  const yil = data[0].yil;
+
+  let html = '';
+
+  // Company banner
+  const totalQayt = sumField(data, 'qaytarilmali');
+  const totalOden = sumField(data, 'odenilmeli');
+  html += `
+  <div class="company-banner">
+    <div class="info">
+      <h2>${company}</h2>
+      <span>VÖEN: ${voen} &nbsp;·&nbsp; ${yil}-ci il</span>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="val">${data.length}</div>
+        <div class="label">Ay sayı</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="color:var(--green)">${fmtRaw(totalQayt)}</div>
+        <div class="label">Qaytarılmalı</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="color:var(--orange)">${fmtRaw(totalOden)}</div>
+        <div class="label">Ödənilməli</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ===== Hissə 1 =====
+  html += `
+  <div class="section">
+    <div class="section-header"><span class="num">1</span> Hesabat dövründəki dövriyyə üzrə əlavə dəyər vergisinin hesablanması</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2" style="min-width:100px">Ay</th>
+            <th colspan="3" class="group-header">301. ƏDV 18% dərəcə ilə cəlb olunan əməliyyatlar</th>
+            <th colspan="3" class="group-header">302. ƏDV-yə sıfır dərəcə ilə cəlb olunan əməliyyatlar</th>
+            <th class="group-header">303. Azad</th>
+            <th class="group-header">304. 20%</th>
+            <th colspan="3" class="group-header">305. Əməliyyatlar üzrə CƏMİ</th>
+          </tr>
+          <tr>
+            <th>Dəyəri (ƏDV-siz)</th><th>Daxil olmuş məbləğ</th><th>ƏDV məbləği</th>
+            <th>Dəyəri (ƏDV-siz)</th><th>Daxil olmuş məbləğ</th><th>ƏDV məbləği</th>
+            <th>ƏDV</th>
+            <th>ƏDV</th>
+            <th>Dəyəri (ƏDV-siz)</th><th>Daxil olmuş məbləğ</th><th>ƏDV məbləği</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+  for (const d of data) {
+    html += `<tr>
+      <td>${monthNames[d.ay]}</td>
+      <td>${fmt(d.h1001_edvsiz)}</td><td>${fmt(d.h1001_edvsiz)}</td><td>${fmt(d.h1001_edv)}</td>
+      <td>${fmt(d.h1002_deyer)}</td><td>${fmt(d.h1002_edvsiz)}</td><td>${fmt(d.h1002_edv)}</td>
+      <td>${fmt(d.h1003_edv)}</td>
+      <td>${fmt(d.h1004_edv)}</td>
+      <td>${fmt(d.h1005_deyer)}</td><td>${fmt(d.h1005_edvsiz)}</td><td>${fmt(d.h1005_edv)}</td>
+    </tr>`;
+  }
+
+  const s1Fields = ['h1001_edvsiz','h1001_edvsiz','h1001_edv','h1002_deyer','h1002_edvsiz','h1002_edv','h1003_edv','h1004_edv','h1005_deyer','h1005_edvsiz','h1005_edv'];
+  html += `<tr class="total-row"><td>CƏMİ</td>`;
+  for (const f of s1Fields) html += `<td>${fmtRaw(sumField(data, f))}</td>`;
+  html += `</tr></tbody></table></div></div>`;
+
+  // ===== Hissə 2 =====
+  html += `
+  <div class="section">
+    <div class="section-header"><span class="num">2</span> ƏDV-nin əvəzləşdirilməsi</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:100px">Ay</th>
+            <th>Alışlar (ƏDV-siz)</th><th>Alışlar (ƏDV)</th>
+            <th>Cəmi əvəzləşdirilən (ƏDV-siz)</th><th>Cəmi əvəzləşdirilən (ƏDV)</th>
+          </tr>
+        </thead>
+        <tbody>`;
+  for (const d of data) {
+    html += `<tr><td>${monthNames[d.ay]}</td>
+      <td>${fmt(d.a1008_edvsiz)}</td><td>${fmt(d.a1008_edv)}</td>
+      <td>${fmt(d.a1016_edvsiz)}</td><td>${fmt(d.a1016_edv)}</td></tr>`;
+  }
+  html += `<tr class="total-row"><td>CƏMİ</td>
+    <td>${fmtRaw(sumField(data,'a1008_edvsiz'))}</td><td>${fmtRaw(sumField(data,'a1008_edv'))}</td>
+    <td>${fmtRaw(sumField(data,'a1016_edvsiz'))}</td><td>${fmtRaw(sumField(data,'a1016_edv'))}</td>
+  </tr></tbody></table></div></div>`;
+
+  // ===== Hissə 3 =====
+  html += `
+  <div class="section">
+    <div class="section-header"><span class="num">3</span> Debitor borc</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:100px">Ay</th>
+            <th>Əvvələ qalıq</th><th>Yaranan borc</th><th>Silinən borc</th><th>Sona qalıq</th>
+          </tr>
+        </thead>
+        <tbody>`;
+  for (const d of data) {
+    html += `<tr><td>${monthNames[d.ay]}</td>
+      <td>${fmt(d.d1400_evvel)}</td><td>${fmt(d.d1400_yaranan)}</td>
+      <td>${fmt(d.d1400_silinen)}</td><td>${fmt(d.d1400_son)}</td></tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
+  // ===== Hissə 4 =====
+  html += `
+  <div class="section">
+    <div class="section-header"><span class="num">4</span> Hesablaşma</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="min-width:100px">Ay</th>
+            <th>Ödənilməli</th><th>Qaytarılmalı</th>
+          </tr>
+        </thead>
+        <tbody>`;
+  for (const d of data) {
+    html += `<tr><td>${monthNames[d.ay]}</td>
+      <td>${fmt(d.odenilmeli)}</td><td>${fmt(d.qaytarilmali)}</td></tr>`;
+  }
+  html += `<tr class="total-row"><td>CƏMİ</td>
+    <td>${fmtRaw(totalOden)}</td><td>${fmtRaw(totalQayt)}</td>
+  </tr></tbody></table></div></div>`;
+
+  return html;
+}
+
+// =========================================
+// EXCEL EXPORT (CSV-based, opens in Excel)
+// =========================================
+function exportCSV(data) {
+  data.sort((a, b) => (a.yil * 100 + a.ay) - (b.yil * 100 + b.ay));
+  const sep = ';';
+  let csv = '\uFEFF'; // BOM for UTF-8
+
+  csv += `ƏDV Hesabat - ${data[0].adi}${sep}VÖEN: ${data[0].voen}\n\n`;
+
+  // Hissə 1
+  csv += `Hissə 1 - Hesabat dövründəki dövriyyə üzrə ƏDV hesablanması\n`;
+  csv += `Ay${sep}301 Dəyəri${sep}301 Daxil olmuş${sep}301 ƏDV${sep}302 Dəyəri${sep}302 Daxil olmuş${sep}302 ƏDV${sep}303 ƏDV${sep}304 ƏDV${sep}305 Dəyəri${sep}305 Daxil olmuş${sep}305 ƏDV\n`;
+  for (const d of data) {
+    csv += `${monthNames[d.ay]}${sep}${d.h1001_edvsiz}${sep}${d.h1001_edvsiz}${sep}${d.h1001_edv}${sep}${d.h1002_deyer}${sep}${d.h1002_edvsiz}${sep}${d.h1002_edv}${sep}${d.h1003_edv}${sep}${d.h1004_edv}${sep}${d.h1005_deyer}${sep}${d.h1005_edvsiz}${sep}${d.h1005_edv}\n`;
+  }
+  csv += '\n';
+
+  // Hissə 2
+  csv += `Hissə 2 - ƏDV-nin əvəzləşdirilməsi\n`;
+  csv += `Ay${sep}Alışlar (ƏDV-siz)${sep}Alışlar (ƏDV)${sep}Cəmi əvəzl. (ƏDV-siz)${sep}Cəmi əvəzl. (ƏDV)\n`;
+  for (const d of data) {
+    csv += `${monthNames[d.ay]}${sep}${d.a1008_edvsiz}${sep}${d.a1008_edv}${sep}${d.a1016_edvsiz}${sep}${d.a1016_edv}\n`;
+  }
+  csv += '\n';
+
+  // Hissə 3
+  csv += `Hissə 3 - Debitor borc\n`;
+  csv += `Ay${sep}Əvvələ qalıq${sep}Yaranan${sep}Silinən${sep}Sona qalıq\n`;
+  for (const d of data) {
+    csv += `${monthNames[d.ay]}${sep}${d.d1400_evvel}${sep}${d.d1400_yaranan}${sep}${d.d1400_silinen}${sep}${d.d1400_son}\n`;
+  }
+  csv += '\n';
+
+  // Hissə 4
+  csv += `Hissə 4 - Hesablaşma\n`;
+  csv += `Ay${sep}Ödənilməli${sep}Qaytarılmalı\n`;
+  for (const d of data) {
+    csv += `${monthNames[d.ay]}${sep}${d.odenilmeli}${sep}${d.qaytarilmali}\n`;
+  }
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `EDV_Hesabat_${data[0].yil}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// =========================================
+// UI LOGIC
+// =========================================
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileList = document.getElementById('fileList');
+const btnGenerate = document.getElementById('btnGenerate');
+const btnClear = document.getElementById('btnClear');
+const btnExport = document.getElementById('btnExport');
+const btnPrint = document.getElementById('btnPrint');
+const reportArea = document.getElementById('reportArea');
+
+let loadedFiles = new Map(); // filename -> xmlText
+let parsedData = [];
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  for (const file of files) {
+    if (!file.name.toLowerCase().endsWith('.xml')) continue;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      loadedFiles.set(file.name, e.target.result);
+      updateUI();
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+}
+
+function updateUI() {
+  fileList.innerHTML = '';
+  for (const [name] of loadedFiles) {
+    const chip = document.createElement('div');
+    chip.className = 'file-chip';
+    chip.innerHTML = `<span class="dot"></span>${name}<span class="remove" data-name="${name}">×</span>`;
+    fileList.appendChild(chip);
+  }
+  document.querySelectorAll('.file-chip .remove').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadedFiles.delete(el.dataset.name);
+      updateUI();
+    });
+  });
+  btnGenerate.disabled = loadedFiles.size === 0;
+  btnClear.style.display = loadedFiles.size > 0 ? '' : 'none';
+}
+
+btnClear.addEventListener('click', () => {
+  loadedFiles.clear();
+  parsedData = [];
+  reportArea.classList.add('hidden');
+  reportArea.innerHTML = '';
+  btnExport.classList.add('hidden');
+  btnPrint.classList.add('hidden');
+  fileInput.value = '';
+  updateUI();
+});
+
+btnGenerate.addEventListener('click', () => {
+  parsedData = [];
+  const errors = [];
+  for (const [name, xml] of loadedFiles) {
+    const d = parseEDVXml(xml);
+    if (!d) { errors.push(name); continue; }
+    // Deduplicate by month
+    const existing = parsedData.findIndex(x => x.ay === d.ay && x.yil === d.yil);
+    if (existing >= 0) parsedData[existing] = d;
+    else parsedData.push(d);
+  }
+  if (errors.length) alert('Xəta olan fayllar: ' + errors.join(', '));
+  if (parsedData.length === 0) { alert('Heç bir düzgün XML tapılmadı.'); return; }
+
+  reportArea.innerHTML = buildReport(parsedData);
+  reportArea.classList.remove('hidden');
+  btnExport.classList.remove('hidden');
+  btnPrint.classList.remove('hidden');
+  reportArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+btnExport.addEventListener('click', () => { if (parsedData.length) exportCSV(parsedData); });
+btnPrint.addEventListener('click', () => window.print());
+</script>
+</body>
+</html>
