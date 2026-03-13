@@ -388,10 +388,20 @@ function parseEDVXml(xmlText) {
     h1005_deyer: rv('HesaplamaUzreEnt', 1005, 'deyer'),
     h1005_edvsiz: rv('HesaplamaUzreEnt', 1005, 'edvsiz'),
     h1005_edv: rv('HesaplamaUzreEnt', 1005, 'edv'),
-    // Əvəzləşdirmə
-    a1008_edvsiz: rv('HesaplamaAvazEnt', 1008, 'edvsiz'),
+    // Əvəzləşdirmə (308-317)
+    a1008_edvsiz: rv('HesaplamaAvazEnt', 1008, 'edvsiz'),  // 308
     a1008_edv: rv('HesaplamaAvazEnt', 1008, 'edv'),
-    a1016_edvsiz: rv('HesaplamaAvazEnt', 1016, 'edvsiz'),
+    a1009_edvsiz: rv('HesaplamaAvazEnt', 1009, 'edvsiz'),  // 309
+    a1009_edv: rv('HesaplamaAvazEnt', 1009, 'edv'),
+    a1010_edvsiz: rv('HesaplamaAvazEnt', 1010, 'edvsiz'),  // 310
+    a1010_edv: rv('HesaplamaAvazEnt', 1010, 'edv'),
+    a1011_edvsiz: rv('HesaplamaAvazEnt', 1011, 'edvsiz'),  // 311
+    a1012_edvsiz: rv('HesaplamaAvazEnt', 1012, 'edvsiz'),  // 312
+    a1012_edv: rv('HesaplamaAvazEnt', 1012, 'edv'),
+    a1013_edv: rv('HesaplamaAvazEnt', 1013, 'edv'),        // 313
+    a1015_edvsiz: rv('HesaplamaAvazEnt', 1015, 'edvsiz'),  // 315
+    a1510_edv: rv('HesaplamaAvazEnt', 1510, 'edv'),        // 316
+    a1016_edvsiz: rv('HesaplamaAvazEnt', 1016, 'edvsiz'),  // 317
     a1016_edv: rv('HesaplamaAvazEnt', 1016, 'edv'),
     // Debitor
     d1400_evvel: rv('DebitorBorcEnt', 1400, 'borcEvvel'),
@@ -416,7 +426,11 @@ function fmtRaw(n) {
 }
 
 function sumField(data, field) {
-  return data.reduce((s, d) => s + d[field], 0);
+  return data.reduce((s, d) => s + (d[field]||0), 0);
+}
+
+function monthLabel(d) {
+  return `${monthNames[d.ay]} ${d.yil}`;
 }
 
 // =========================================
@@ -427,7 +441,8 @@ function buildReport(data) {
 
   const company = data[0].adi;
   const voen = data[0].voen;
-  const yil = data[0].yil;
+  const years = [...new Set(data.map(d => d.yil))];
+  const yearStr = years.length === 1 ? `${years[0]}-ci il` : `${years[0]}–${years[years.length-1]}`;
 
   let html = '';
 
@@ -438,7 +453,7 @@ function buildReport(data) {
   <div class="company-banner">
     <div class="info">
       <h2>${company}</h2>
-      <span>VÖEN: ${voen} &nbsp;·&nbsp; ${yil}-ci il</span>
+      <span>VÖEN: ${voen} &nbsp;·&nbsp; ${yearStr}</span>
     </div>
     <div class="stats">
       <div class="stat">
@@ -464,7 +479,7 @@ function buildReport(data) {
       <table>
         <thead>
           <tr>
-            <th rowspan="2" style="min-width:100px">Ay</th>
+            <th rowspan="2" style="min-width:120px">Ay</th>
             <th colspan="3" class="group-header">301. ƏDV 18% dərəcə ilə cəlb olunan əməliyyatlar</th>
             <th colspan="3" class="group-header">302. ƏDV-yə sıfır dərəcə ilə cəlb olunan əməliyyatlar</th>
             <th class="group-header">303. Azad</th>
@@ -483,7 +498,7 @@ function buildReport(data) {
 
   for (const d of data) {
     html += `<tr>
-      <td>${monthNames[d.ay]}</td>
+      <td>${monthLabel(d)}</td>
       <td>${fmt(d.h1001_edvsiz)}</td><td>${fmt(d.h1001_edvsiz)}</td><td>${fmt(d.h1001_edv)}</td>
       <td>${fmt(d.h1002_deyer)}</td><td>${fmt(d.h1002_edvsiz)}</td><td>${fmt(d.h1002_edv)}</td>
       <td>${fmt(d.h1003_edv)}</td>
@@ -497,29 +512,52 @@ function buildReport(data) {
   for (const f of s1Fields) html += `<td>${fmtRaw(sumField(data, f))}</td>`;
   html += `</tr></tbody></table></div></div>`;
 
-  // ===== Hissə 2 =====
+  // ===== Hissə 2 (detailed 308-317) =====
+  const h2rows = [
+    { code:'308', label:'308. VM 175.1-ci maddəsinə əsasən alınmış elektron vergi hesab-fakturalar üzrə nağdsız qaydada ödənilmiş məbləğ', edvsiz:'a1008_edvsiz', edv:'a1008_edv' },
+    { code:'309', label:'309. 01.01.2001-ci il tarixinə olan borcların nağdsız qaydada ödənilmiş məbləği', edvsiz:null, edv:'a1009_edv' },
+    { code:'310', label:'310. İdxalda ƏDV-yə cəlb olunmuş mallara(işlərə,xidmətlərə) görə ödənilmiş məbləğ', edvsiz:'a1010_edvsiz', edv:'a1010_edv' },
+    { code:'311', label:'311. İdxalda ƏDV-dən azad olunan mallara(işlərə,xidmətlərə) görə ödənilmiş məbləğ', edvsiz:'a1011_edvsiz', edv:null },
+    { code:'312', label:'312. Vergi Məcəlləsinin 169-cu maddəsinə əsasən qeyri-rezidentə ödənilmiş məbləğ', edvsiz:null, edv:'a1012_edv' },
+    { code:'313', label:'313. Vergi Məcəlləsi 175.2-ci maddəsinə əsasən əvəzləşdirilməsinə yol verilməyən əməliyyatlar', edvsiz:null, edv:'a1013_edv' },
+    { code:'314', label:'314. Vergi Məcəlləsinin 175.3-cü maddəsinə əsasən əvəzləşdirilməsinə yol verilməyən əməliyyatlar', edvsiz:null, edv:null },
+    { code:'315', label:'315. Vergi Məcəlləsinin 175.4-cü maddəsinə əsasən əvəzləşdirilməsinə yol verilməyən ƏDV məbləği', edvsiz:'a1015_edvsiz', edv:null },
+    { code:'316', label:'316. ƏDV-yə sıfır(0) faiz dərəcəsi ilə ödənilmiş məbləğ', edvsiz:null, edv:'a1510_edv' },
+    { code:'317', label:'317. Əməliyyatlar üzrə CƏMİ', edvsiz:'a1016_edvsiz', edv:'a1016_edv' },
+  ];
+
   html += `
   <div class="section">
-    <div class="section-header"><span class="num">2</span> ƏDV-nin əvəzləşdirilməsi</div>
+    <div class="section-header"><span class="num">2</span> Hesabat dövründəki dövriyyə əvəzləşdirilən əlavə dəyər vergisinin hesablanması</div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th style="min-width:100px">Ay</th>
-            <th>Alışlar (ƏDV-siz)</th><th>Alışlar (ƏDV)</th>
-            <th>Cəmi əvəzləşdirilən (ƏDV-siz)</th><th>Cəmi əvəzləşdirilən (ƏDV)</th>
-          </tr>
-        </thead>
-        <tbody>`;
-  for (const d of data) {
-    html += `<tr><td>${monthNames[d.ay]}</td>
-      <td>${fmt(d.a1008_edvsiz)}</td><td>${fmt(d.a1008_edv)}</td>
-      <td>${fmt(d.a1016_edvsiz)}</td><td>${fmt(d.a1016_edv)}</td></tr>`;
+            <th rowspan="2" style="min-width:120px">Ay</th>`;
+  for (const r of h2rows) {
+    html += `<th colspan="2" class="group-header" style="white-space:normal;min-width:140px">${r.label}</th>`;
   }
-  html += `<tr class="total-row"><td>CƏMİ</td>
-    <td>${fmtRaw(sumField(data,'a1008_edvsiz'))}</td><td>${fmtRaw(sumField(data,'a1008_edv'))}</td>
-    <td>${fmtRaw(sumField(data,'a1016_edvsiz'))}</td><td>${fmtRaw(sumField(data,'a1016_edv'))}</td>
-  </tr></tbody></table></div></div>`;
+  html += `</tr><tr>`;
+  for (const r of h2rows) {
+    html += `<th>Dövriyyə (ƏDV-siz)</th><th>ƏDV məbləği</th>`;
+  }
+  html += `</tr></thead><tbody>`;
+
+  for (const d of data) {
+    html += `<tr><td>${monthLabel(d)}</td>`;
+    for (const r of h2rows) {
+      html += `<td>${fmt(r.edvsiz ? (d[r.edvsiz]||0) : 0)}</td>`;
+      html += `<td>${fmt(r.edv ? (d[r.edv]||0) : 0)}</td>`;
+    }
+    html += `</tr>`;
+  }
+
+  html += `<tr class="total-row"><td>CƏMİ</td>`;
+  for (const r of h2rows) {
+    html += `<td>${fmtRaw(r.edvsiz ? sumField(data, r.edvsiz) : 0)}</td>`;
+    html += `<td>${fmtRaw(r.edv ? sumField(data, r.edv) : 0)}</td>`;
+  }
+  html += `</tr></tbody></table></div></div>`;
 
   // ===== Hissə 3 =====
   html += `
@@ -529,13 +567,13 @@ function buildReport(data) {
       <table>
         <thead>
           <tr>
-            <th style="min-width:100px">Ay</th>
+            <th style="min-width:120px">Ay</th>
             <th>Əvvələ qalıq</th><th>Yaranan borc</th><th>Silinən borc</th><th>Sona qalıq</th>
           </tr>
         </thead>
         <tbody>`;
   for (const d of data) {
-    html += `<tr><td>${monthNames[d.ay]}</td>
+    html += `<tr><td>${monthLabel(d)}</td>
       <td>${fmt(d.d1400_evvel)}</td><td>${fmt(d.d1400_yaranan)}</td>
       <td>${fmt(d.d1400_silinen)}</td><td>${fmt(d.d1400_son)}</td></tr>`;
   }
@@ -549,13 +587,13 @@ function buildReport(data) {
       <table>
         <thead>
           <tr>
-            <th style="min-width:100px">Ay</th>
+            <th style="min-width:120px">Ay</th>
             <th>Ödənilməli</th><th>Qaytarılmalı</th>
           </tr>
         </thead>
         <tbody>`;
   for (const d of data) {
-    html += `<tr><td>${monthNames[d.ay]}</td>
+    html += `<tr><td>${monthLabel(d)}</td>
       <td>${fmt(d.odenilmeli)}</td><td>${fmt(d.qaytarilmali)}</td></tr>`;
   }
   html += `<tr class="total-row"><td>CƏMİ</td>
@@ -609,14 +647,17 @@ async function exportXLSX(data) {
 
   // Column widths
   ws.columns = [
-    {width:14},{width:20},{width:20},{width:17},{width:20},{width:20},{width:17},{width:14},{width:14},{width:20},{width:20},{width:17}
+    {width:18},{width:20},{width:20},{width:17},{width:20},{width:20},{width:17},{width:14},{width:14},{width:20},{width:20},{width:17}
   ];
 
   let row = 1;
 
+  const yearsXls = [...new Set(data.map(d => d.yil))];
+  const yearStrXls = yearsXls.length === 1 ? yearsXls[0] : `${yearsXls[0]}–${yearsXls[yearsXls.length-1]}`;
+
   // ===== TITLE =====
   ws.mergeCells(row, 1, row, 12);
-  ws.getCell(row, 1).value = `ƏDV (НДС) Bəyannamə Hesabatı — ${data[0].yil}`;
+  ws.getCell(row, 1).value = `ƏDV (НДС) Bəyannamə Hesabatı — ${yearStrXls}`;
   ws.getCell(row, 1).font = titleFont;
   ws.getCell(row, 1).alignment = { horizontal:'center' };
   row++;
@@ -666,7 +707,7 @@ async function exportXLSX(data) {
   // Data rows
   const ds1 = row;
   for (const d of data) {
-    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 1).value = `${monthNames[d.ay]} ${d.yil}`;
     ws.getCell(row, 2).value = d.h1001_edvsiz;
     ws.getCell(row, 3).value = d.h1001_edvsiz;
     ws.getCell(row, 4).value = d.h1001_edv;
@@ -693,33 +734,67 @@ async function exportXLSX(data) {
   styleRange(row, 2, row, 12, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
   row += 2;
 
-  // ===== HİSSƏ 2 =====
-  ws.mergeCells(row, 1, row, 5);
-  ws.getCell(row, 1).value = 'Hissə 2 - ƏDV-nin əvəzləşdirilməsi';
-  styleRange(row, 1, row, 5, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
+  // ===== HİSSƏ 2 (308-317) =====
+  const h2rowsXls = [
+    { code:'308', label:'308. VM 175.1 elektron vergi hesab-fakturalar', edvsiz:'a1008_edvsiz', edv:'a1008_edv' },
+    { code:'309', label:'309. 01.01.2001 borclar', edvsiz:null, edv:'a1009_edv' },
+    { code:'310', label:'310. İdxalda ƏDV-yə cəlb olunmuş', edvsiz:'a1010_edvsiz', edv:'a1010_edv' },
+    { code:'311', label:'311. İdxalda ƏDV-dən azad', edvsiz:'a1011_edvsiz', edv:null },
+    { code:'312', label:'312. VM 169 qeyri-rezident', edvsiz:null, edv:'a1012_edv' },
+    { code:'313', label:'313. VM 175.2 əvəzləşdirilməyən', edvsiz:null, edv:'a1013_edv' },
+    { code:'314', label:'314. VM 175.3 əvəzləşdirilməyən', edvsiz:null, edv:null },
+    { code:'315', label:'315. VM 175.4 əvəzləşdirilməyən ƏDV', edvsiz:'a1015_edvsiz', edv:null },
+    { code:'316', label:'316. Sıfır faiz dərəcəsi', edvsiz:null, edv:'a1510_edv' },
+    { code:'317', label:'317. Əməliyyatlar üzrə CƏMİ', edvsiz:'a1016_edvsiz', edv:'a1016_edv' },
+  ];
+  const h2cols = 1 + h2rowsXls.length * 2; // Ay + 10 * 2 = 21
+  ws.mergeCells(row, 1, row, h2cols);
+  ws.getCell(row, 1).value = 'Hissə 2 - Hesabat dövründəki dövriyyə əvəzləşdirilən ƏDV hesablanması';
+  styleRange(row, 1, row, h2cols, { font:sectionFont, fill:sectionFill, alignment:leftAlign, border });
   row++;
-  ['Ay','Alışlar (ƏDV-siz)','Alışlar (ƏDV)','Cəmi əvəzləşdirilən (ƏDV-siz)','Cəmi əvəzləşdirilən (ƏDV)'].forEach((h, i) => { ws.getCell(row, 1+i).value = h; });
-  styleRange(row, 1, row, 5, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
-  ws.getRow(row).height = 32;
+
+  // Group headers
+  const gr2 = row;
+  ws.mergeCells(gr2, 1, gr2+1, 1);
+  ws.getCell(gr2, 1).value = 'Ay';
+  h2rowsXls.forEach((r, i) => {
+    const c = 2 + i * 2;
+    ws.mergeCells(gr2, c, gr2, c + 1);
+    ws.getCell(gr2, c).value = r.label;
+  });
+  styleRange(gr2, 1, gr2, h2cols, { font:groupFont, fill:groupFill, alignment:centerAlign, border });
   row++;
+  // Sub-headers
+  h2rowsXls.forEach((r, i) => {
+    const c = 2 + i * 2;
+    ws.getCell(row, c).value = 'ƏDV-siz';
+    ws.getCell(row, c + 1).value = 'ƏDV';
+  });
+  styleRange(row, 1, row, h2cols, { font:headerFont, fill:headerFill, alignment:centerAlign, border });
+  ws.getRow(row).height = 28;
+  row++;
+
   const ds2 = row;
   for (const d of data) {
-    ws.getCell(row, 1).value = monthNames[d.ay];
-    ws.getCell(row, 2).value = d.a1008_edvsiz;
-    ws.getCell(row, 3).value = d.a1008_edv;
-    ws.getCell(row, 4).value = d.a1016_edvsiz;
-    ws.getCell(row, 5).value = d.a1016_edv;
+    ws.getCell(row, 1).value = `${monthNames[d.ay]} ${d.yil}`;
+    h2rowsXls.forEach((r, i) => {
+      ws.getCell(row, 2 + i*2).value = r.edvsiz ? (d[r.edvsiz]||0) : 0;
+      ws.getCell(row, 3 + i*2).value = r.edv ? (d[r.edv]||0) : 0;
+    });
     styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
-    styleRange(row, 2, row, 5, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
+    styleRange(row, 2, row, h2cols, { font:dataFont, alignment:rightAlign, border, numFmt:nf });
     if ((row - ds2) % 2 === 1) {
-      styleRange(row, 1, row, 5, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
+      styleRange(row, 1, row, h2cols, { fill:{type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F6FC'}} });
     }
     row++;
   }
   ws.getCell(row, 1).value = 'CƏMİ';
-  ['a1008_edvsiz','a1008_edv','a1016_edvsiz','a1016_edv'].forEach((f, i) => { ws.getCell(row, 2+i).value = sumF(f); });
+  h2rowsXls.forEach((r, i) => {
+    ws.getCell(row, 2 + i*2).value = r.edvsiz ? sumF(r.edvsiz) : 0;
+    ws.getCell(row, 3 + i*2).value = r.edv ? sumF(r.edv) : 0;
+  });
   styleRange(row, 1, row, 1, { font:totalFont, fill:totalFill, alignment:leftAlign, border });
-  styleRange(row, 2, row, 5, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
+  styleRange(row, 2, row, h2cols, { font:totalFont, fill:totalFill, alignment:rightAlign, border, numFmt:nf });
   row += 2;
 
   // ===== HİSSƏ 3 =====
@@ -732,7 +807,7 @@ async function exportXLSX(data) {
   row++;
   const ds3 = row;
   for (const d of data) {
-    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 1).value = `${monthNames[d.ay]} ${d.yil}`;
     ws.getCell(row, 2).value = d.d1400_evvel;
     ws.getCell(row, 3).value = d.d1400_yaranan;
     ws.getCell(row, 4).value = d.d1400_silinen;
@@ -756,7 +831,7 @@ async function exportXLSX(data) {
   row++;
   const ds4 = row;
   for (const d of data) {
-    ws.getCell(row, 1).value = monthNames[d.ay];
+    ws.getCell(row, 1).value = `${monthNames[d.ay]} ${d.yil}`;
     ws.getCell(row, 2).value = d.odenilmeli;
     ws.getCell(row, 3).value = d.qaytarilmali;
     styleRange(row, 1, row, 1, { font:dataFont, alignment:leftAlign, border });
@@ -777,7 +852,7 @@ async function exportXLSX(data) {
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `EDV_Hesabat_${data[0].yil}.xlsx`;
+  a.download = `EDV_Hesabat_${yearStrXls}.xlsx`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
